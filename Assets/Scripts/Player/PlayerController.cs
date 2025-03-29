@@ -1,168 +1,158 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Windows;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : MonoBehaviour
 {
-    [SerializeField]
-    LayerMask environmentMask;
+    [SerializeField] LayerMask environmentMask;
 
     [Header("Dependencies")]
+    [SerializeField]
     Rigidbody2D rb;
 
     [Header("Combat")]
-    [SerializeField]
-    Collider2D hitbox;
-    [SerializeField]
-    bool attacking;
+    [SerializeField] BoxCollider2D hitbox;
+    [SerializeField] bool attacking;
     public Attack basicAttack;
 
     [Header("Movement")]
-    [SerializeField]
-    float speed = 5f;
-    [SerializeField]
-    float airMult = 0.25f;
-    [SerializeField]
-    float jumpForce = 5f;
-    [SerializeField]
-    float groundRayLength = 1.01f;
+    [SerializeField] float speed = 5f;
+    [SerializeField] float airMult = 0.25f;
+    [SerializeField] float crouchThreshold = -0.8f;
+    [SerializeField] float jumpForce = 5f;
+    [SerializeField] float jumpChargeRate = 2.5f;
+    [SerializeField] float maxJumpCharge = 5f;
+    [SerializeField] float jumpCharge = 0f;
+
+    [SerializeField] float groundRayLength = 1.01f;
 
     [Header("State Machine")]
-    [SerializeField]
-    InputFrame lastInput;
-    [SerializeField]
-    PlayerState currentState;
+    [SerializeField] PlayerState currentState;
     public PlayerState State => currentState;
 
-    PlayerState idle;
-    PlayerState walk;
-    PlayerState jump;
-    PlayerState fall;
-
+    Dictionary<string, PlayerState> states = new();
     Transition[] transitions;
 
-    bool IsGrounded()
+    bool Grounded => Physics2D.Raycast(transform.position, Vector3.down, groundRayLength, environmentMask).collider != null;
+
+    public void Transition(PlayerState target, InputFrame input)
     {
-        return Physics2D.Raycast(transform.position, Vector3.down, groundRayLength, environmentMask).collider != null;
+        currentState.Exit(input);
+        currentState = target;
+        currentState.Init(input);
     }
 
-    public void Transition(PlayerState target)
+    public void CheckTransitions(InputFrame input)
     {
-        currentState = target;
-        currentState.Init();
+        foreach (Transition transition in transitions)
+        {
+            if (transition.Try(this, input))
+            {
+                EventManager.Inst.Send(new PlayerTransitionEvent(transition.Target))
+                break;
+            }
+        }
+    }
+
+    void AddState(PlayerState state)
+    {
+        states.Add(state.name, state);
+    }
+
+    void InitStates()
+    {
+        AddState(new PlayerState("Idle",
+            _update: (InputFrame input, float deltaTime) =>
+            {
+                rb.linearVelocity = Vector2.zero;
+            }
+        ));
+
+        AddState(new PlayerState("Walk",
+            _update: (InputFrame input, float deltaTime) =>
+            {
+                // Only modify the horizontal components of velocity
+                Vector2 currentVelocity = rb.linearVelocity;
+                Vector2 horizontalVelocity = new Vector3(input.move.x * speed, 0f);
+                rb.linearVelocity = new Vector2(horizontalVelocity.x, currentVelocity.y);
+            }
+        ));
+
+        AddState(new PlayerState("Crouch",
+            _init: (InputFrame input) => jumpCharge = 0f,
+            _update: (InputFrame input, float deltaTime) =>
+            {
+                rb.linearVelocity = Vector2.MoveTowards(rb.linearVelocity, Vector2.zero, deltaTime);
+                jumpCharge = Mathf.Min(maxJumpCharge, jumpCharge + (jumpChargeRate * deltaTime));
+            },
+            _exit: (InputFrame input) => {
+                if (!input.jumpDown)
+                    jumpCharge = 0f;
+            }
+        ));
+
+        AddState(new PlayerState("Jump",
+            _init: (InputFrame input) =>
+            {
+                rb.AddForce(Vector2.up * (jumpForce + jumpCharge), ForceMode2D.Impulse);
+            },
+            _exit: (InputFrame input) =>
+            {
+                jumpCharge = 0f;
+            }
+        ));
+
+        AddState(new PlayerState("Fall",
+            _update: (InputFrame input, float deltaTime) =>
+            {
+                rb.linearVelocity = new Vector2(input.move.x * speed * airMult, rb.linearVelocity.y);
+            }
+        ));
     }
 
     void InitTransitions()
     {
-        idle = new PlayerState("Idle", (InputFrame info, float deltaTime) => {
-            rb.linearVelocity = Vector2.zero;
-        });
-
-        walk = new PlayerState("Walk",
-            (InputFrame input, float deltaTime) =>
-            {
-                Vector2 moveDirection = lastInput.move;
-
-                // Only modify the horizontal components of velocity
-                Vector2 currentVelocity = rb.linearVelocity;
-                Vector2 horizontalVelocity = new Vector3(moveDirection.x * speed, 0f);
-                rb.linearVelocity = new Vector2(horizontalVelocity.x, currentVelocity.y);
-            }
-        );
-
-        jump = new PlayerState("Jump",
-            () =>
-            {
-                rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
-            }
-        );
-
-        fall = new PlayerState("Fall",
-            (InputFrame info, float deltaTime) => {
-                Vector2 moveDirection = lastInput.move;
-
-                rb.linearVelocity = new Vector2(moveDirection.x * speed * airMult, rb.linearVelocity.y);
-            }
-        );
-
         //TODO: Input bindings
         transitions = new Transition[] {
-            new Transition(idle, walk, controller => controller.lastInput.move != Vector2.zero),
-            new Transition(walk, idle, controller => controller.lastInput.move == Vector2.zero),
+            new Transition(states["Idle"], states["Walk"], (player, input) => input.move != Vector2.zero),
+            new Transition(states["Walk"], states["Idle"], (player, input) => input.move == Vector2.zero),
 
-            new Transition(jump, controller => controller.IsGrounded() && controller.lastInput.jump),
-            new Transition(fall, controller => !controller.IsGrounded()),
+            new Transition(states["Crouch"], (player, input) => player.Grounded && input.move.y < crouchThreshold),
+            new Transition(states["Crouch"], states["Idle"], (player, input) => input.move.y > crouchThreshold),
 
-            new Transition(fall, idle, controller => controller.IsGrounded()),
+            new Transition(states["Jump"], (player, input) => player.Grounded && input.jumpDown),
+            new Transition(states["Fall"], (player, input) => !player.Grounded),
+
+            new Transition(states["Fall"], states["Idle"], (player, input) => player.Grounded),
 
             //TODO: Will fix if reducing velocity to 0 for a frame becomes an issue.
             //new Transition(fall, walk, controller => controller.IsGrounded() && controller.lastInput.move != Vector2.zero),
         };
     }
 
-    public void Attack(Attack atk)
-    {
-        if (attacking) return;
-        StartCoroutine(DoAttack(atk));
-    }
-
-    IEnumerator DoAttack(Attack atk)
-    {
-        attacking = true;
-        int frame = 0;
-
-        while(true)
-        {
-            if (frame > atk.Length) break;
-            hitbox.enabled = atk[frame].active;
-            frame++;
-            yield return new WaitForEndOfFrame();
-        }
-
-        yield return null;
-    }
-
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
 
+        InitStates();
         InitTransitions();
 
-        currentState = idle;
-    }
-
-    private void Start()
-    {
-        lastInput = InputManager.Inst.ProcessInput();
-    }
-
-    void Update()
-    {
-        lastInput = InputManager.Inst.ProcessInput();
-
-        foreach (Transition transition in transitions)
-        {
-            if (transition.Try(this))
-                break;
-        }
-
-        if (lastInput.attack)
-        {
-            Attack(basicAttack);
-        }
+        currentState = states["Idle"];
     }
 
     void FixedUpdate()
     {
-        currentState.Update(lastInput, Time.deltaTime);
+        currentState.Update(InputManager.Inst.lastInput, Time.deltaTime);
     }
 
     private void OnDrawGizmos()
     {
-        if (IsGrounded())
+        if (Grounded)
             Gizmos.color = Color.green;
         else
             Gizmos.color = Color.red;
@@ -170,87 +160,3 @@ public class PlayerController : MonoBehaviour
         Gizmos.DrawLine(transform.position, transform.position + (Vector3.down * groundRayLength));
     }
 }
-
-[System.Serializable]
-public struct PlayerState
-{
-    public string name;
-    public Action Init;
-    //TODO: Is passing InputInfo redundant?
-    public Action<InputFrame, float> Update;
-    public Action Exit;
-    public bool complete;
-
-    public static PlayerState Any => new PlayerState("Any", () => { });
-
-    public PlayerState(string _name, Action _init, Action<InputFrame, float> _update, Action _exit)
-    {
-        name = _name;
-        Init = _init;
-        Update = _update;
-        Exit = _exit;
-        complete = true;
-    }
-
-    public PlayerState(string _name, Action _init)
-    {
-        name = _name;
-        Init = _init;
-        Update = (InputFrame input, float deltaTime) => { };
-        Exit = () => { };
-        complete = true;
-    }
-
-    public PlayerState(string _name, Action<InputFrame, float> _update)
-    {
-        name = _name;
-        Init = () => { };
-        Update = _update;
-        Exit = () => { };
-        complete = true;
-    }
-
-    public static bool operator ==(PlayerState left, PlayerState right) { return left.name == right.name; }
-
-    public static bool operator !=(PlayerState left, PlayerState right) { return !(left == right); }
-
-    public override string ToString() { return name; }
-}
-
-[System.Serializable]
-public struct Transition
-{
-    PlayerState source;
-    PlayerState target;
-    Predicate<PlayerController>[] condition;
-    bool fromAny;
-
-    public Transition(PlayerState _source, PlayerState _target, params Predicate<PlayerController>[] _condition)
-    {
-        source = _source;
-        target = _target;
-        condition = _condition;
-        fromAny = false;
-    }
-
-    public Transition(PlayerState _target, params Predicate<PlayerController>[] _condition)
-    {
-        source = PlayerState.Any;
-        target = _target;
-        condition = _condition;
-        fromAny = true;
-    }
-
-    public bool Try(PlayerController controller)
-    {
-        if (!source.complete) return false;
-
-        if ((fromAny || controller.State == source) && condition.All(condition => condition(controller)))
-        {
-            controller.Transition(target);
-            return true;
-        }
-        return false;
-    }
-}
-

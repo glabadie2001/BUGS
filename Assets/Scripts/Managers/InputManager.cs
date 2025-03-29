@@ -7,6 +7,8 @@ public class InputManager : MonoBehaviour
 {
     public static InputManager Inst;
 
+    public InputFrame lastInput;
+
     public string[] actions = {
         "Move",
         "Look",
@@ -14,43 +16,58 @@ public class InputManager : MonoBehaviour
         "Attack",
         "Dash"
      };
-    Dictionary<string, InputAction> actionMap;
+    Dictionary<string, InputAction> actionMap = new Dictionary<string, InputAction>();
 
     private void Awake()
     {
+        //Singleton boilerplate
         if (Inst == null)
             Inst = this;
         else if (Inst != this)
             Destroy(this);
 
-
+        //Initialize mapping to global actions (see ProjectSettings/Input in engine)
         foreach (var action in actions)
         {
             actionMap.Add(action, InputSystem.actions.FindAction(action));
         }
     }
 
+    private void Start()
+    {
+        lastInput = ProcessInput();
+    }
+
+    private void Update()
+    {
+        lastInput = ProcessInput();
+    }
+
     public InputFrame ProcessInput()
     {
         Vector2 movement = actionMap["Move"].ReadValue<Vector2>();
-        // Normalize input if it exceeds 1 in combined length (for diagonal movement)
         if (movement.magnitude > 1f)
             movement.Normalize();
 
-        return new InputFrame(movement, actionMap["Jump"].WasPerformedThisFrame(), actionMap["Attack"].WasPerformedThisFrame());
+        bool jumpDown = actionMap["Jump"].WasPressedThisFrame();
+
+        bool attackDown = actionMap["Attack"].WasPressedThisFrame();
+
+        return new InputFrame(movement, jumpDown, attackDown);
     }
 }
 
+[System.Serializable]
 public struct InputFrame
 {
     public Vector2 move;
-    public bool jump;
+    public bool jumpDown;
     public bool attack;
 
-    public InputFrame(Vector2 _move, bool _jump, bool _attack)
+    public InputFrame(Vector2 _move, bool _jumpDown, bool _attack)
     {
         move = _move;
-        jump = _jump;
+        jumpDown = _jumpDown;
         attack = _attack;
     }
 }
