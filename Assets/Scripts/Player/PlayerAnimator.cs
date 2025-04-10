@@ -9,7 +9,7 @@ public class PlayerAnimator : MonoBehaviour
 
     public void PlayAnim(string trigger)
     {
-        attackAnim.SetTrigger(trigger);
+        playerAnim.Play(trigger);
     }
 
     public void PlayAttack(string trigger)

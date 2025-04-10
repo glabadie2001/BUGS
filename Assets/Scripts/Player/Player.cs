@@ -8,9 +8,14 @@ public class Player : MonoBehaviour
 
     private void Update()
     {
-        controller.CheckTransitions(InputManager.Inst.lastInput);
+        InputFrame input = InputManager.Inst.lastInput;
 
-        if (InputManager.Inst.lastInput.attack)
+        if (input.move.x != 0)
+            transform.localScale = new Vector3(-Mathf.Sign(input.move.x), transform.localScale.y, transform.localScale.z);
+
+        controller.fsm.Poll(Time.deltaTime);
+
+        if (input.attack)
         {
             EventManager.Inst.Send(new PlayerAttackEvent(this, controller.basicAttack));
         }

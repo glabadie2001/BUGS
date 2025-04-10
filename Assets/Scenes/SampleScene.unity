@@ -153,13 +153,21 @@ MonoBehaviour:
   lastInput:
     move: {x: 0, y: 0}
     jumpDown: 0
+    jumpHeld: 0
+    jumpUp: 0
     attack: 0
+    crouchDown: 0
+    crouchHeld: 0
+  jumpHeld: 0
+  crouchHeld: 0
   actions:
   - Move
   - Look
   - Jump
   - Attack
   - Dash
+  - Crouch
+  - Slide
 --- !u!4 &73643504
 Transform:
   m_ObjectHideFlags: 0
@@ -276,8 +284,8 @@ Rigidbody2D:
     serializedVersion: 2
     m_Bits: 0
   m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 0
+  m_SleepingMode: 0
+  m_CollisionDetection: 1
   m_Constraints: 4
 --- !u!4 &311040411
 Transform:
@@ -421,14 +429,22 @@ MonoBehaviour:
   hitbox: {fileID: 1881520881}
   attacking: 0
   basicAttack: {fileID: 11400000, guid: 052c93786368ae84f881ce0dd309cd0b, type: 2}
+  gravity: 10
+  fallGravityMult: 1.5
   speed: 5
+  accel: 50
+  decel: 5
   airMult: 1
+  jumpStopMult: 0.5
   crouchThreshold: -0.8
-  jumpForce: 5
+  jumpVelocity: 10
   jumpChargeRate: 2.5
   maxJumpCharge: 5
   jumpCharge: 0
-  groundRayLength: 0.64
+  slideMult: 1.5
+  slideSlowRate: 0
+  groundRayLength: 0.66
+  velocity: {x: 0, y: 0}
   currentState:
     name: 
     complete: 0
@@ -444,7 +460,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bc14fe140981c9942bbcbb84f2c30429, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerAnim: {fileID: 0}
+  playerAnim: {fileID: 2087871444}
   attackAnim: {fileID: 1881520882}
 --- !u!114 &311040416
 MonoBehaviour:
@@ -1205,7 +1221,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.5, y: 1.5, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 311040411}
@@ -1244,17 +1260,17 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 0.022978544, y: -0.10272783}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1, y: 1}
+    oldSize: {x: 2, y: 1.25}
     newSize: {x: 1, y: 1}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 0.55394506, y: 1.0648807}
   m_EdgeRadius: 0
 --- !u!212 &2087871443
 SpriteRenderer:
@@ -1300,9 +1316,9 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
+  m_Sprite: {fileID: 8793639957104055765, guid: e179f480eb158c447a8f98de3682631b, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_FlipX: 0
+  m_FlipX: 1
   m_FlipY: 0
   m_DrawMode: 0
   m_Size: {x: 1, y: 1}
@@ -1321,7 +1337,7 @@ Animator:
   m_GameObject: {fileID: 2087871440}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 7762babaf2cad314787b0cf5133a2c59, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -1337,9 +1353,9 @@ Animator:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 73643504}
   - {fileID: 519420032}
   - {fileID: 619394802}
   - {fileID: 1541896566}
   - {fileID: 311040411}
-  - {fileID: 73643504}
   - {fileID: 1989542346}

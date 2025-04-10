@@ -9,12 +9,17 @@ public class InputManager : MonoBehaviour
 
     public InputFrame lastInput;
 
+    [SerializeField] bool jumpHeld = false;
+    [SerializeField] bool crouchHeld = false;
+
     public string[] actions = {
         "Move",
         "Look",
         "Jump",
         "Attack",
-        "Dash"
+        "Dash",
+        "Crouch",
+        "Slide"
      };
     Dictionary<string, InputAction> actionMap = new Dictionary<string, InputAction>();
 
@@ -50,10 +55,16 @@ public class InputManager : MonoBehaviour
             movement.Normalize();
 
         bool jumpDown = actionMap["Jump"].WasPressedThisFrame();
+        bool jumpUp = actionMap["Jump"].WasReleasedThisFrame();
+        jumpHeld = (jumpHeld || jumpDown) && !jumpUp;
 
         bool attackDown = actionMap["Attack"].WasPressedThisFrame();
 
-        return new InputFrame(movement, jumpDown, attackDown);
+        bool crouchDown = actionMap["Crouch"].WasPressedThisFrame();
+        bool crouchUp = actionMap["Crouch"].WasReleasedThisFrame();
+        crouchHeld = (crouchHeld || crouchDown) && !crouchUp;
+
+        return new InputFrame(movement, jumpDown, jumpHeld, jumpUp, attackDown, crouchDown, crouchHeld);
     }
 }
 
@@ -62,12 +73,20 @@ public struct InputFrame
 {
     public Vector2 move;
     public bool jumpDown;
+    public bool jumpHeld;
+    public bool jumpUp;
     public bool attack;
+    public bool crouchDown;
+    public bool crouchHeld;
 
-    public InputFrame(Vector2 _move, bool _jumpDown, bool _attack)
+    public InputFrame(Vector2 _move, bool _jumpDown, bool _jumpHeld, bool _jumpUp, bool _attack, bool _crouchDown, bool _crouchHeld)
     {
         move = _move;
         jumpDown = _jumpDown;
+        jumpHeld = _jumpHeld;
+        jumpUp = _jumpUp;
         attack = _attack;
+        crouchDown = _crouchDown;
+        crouchHeld = _crouchHeld;
     }
 }

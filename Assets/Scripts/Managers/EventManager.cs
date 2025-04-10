@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Gabadie.GFSM;
 
 public class EventManager : MonoBehaviour
 {
@@ -55,9 +56,10 @@ public class PlayerAttackEvent : Event
 public class PlayerTransitionEvent : Event
 {
     Player player;
-    PlayerState target;
+    InputFrame input;
+    State target;
 
-    public PlayerTransitionEvent(Player _player, PlayerState _target)
+    public PlayerTransitionEvent(Player _player, State _target)
     {
         player = _player;
         target = _target;
@@ -65,7 +67,6 @@ public class PlayerTransitionEvent : Event
 
     public override void Execute()
     {
-        player.animator.
-        player.controller.Transition(target, InputManager.Inst.lastInput);
+        player.animator.PlayAnim(target.Name);
     }
 }

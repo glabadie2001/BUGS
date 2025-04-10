@@ -1,10 +1,5 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
+using Gabadie.GFSM;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.Windows;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : MonoBehaviour
@@ -21,118 +16,163 @@ public class PlayerController : MonoBehaviour
     public Attack basicAttack;
 
     [Header("Movement")]
+    [SerializeField] float gravity = 1f;
+    [SerializeField] float fallGravityMult = 1.5f;
     [SerializeField] float speed = 5f;
-    [SerializeField] float airMult = 0.25f;
+    [SerializeField] float accel = 1f;
+    [SerializeField] float decel = 1f;
+    [SerializeField] float airMult = 1f;
+    [SerializeField] float jumpStopMult = 0.5f;
     [SerializeField] float crouchThreshold = -0.8f;
-    [SerializeField] float jumpForce = 5f;
+    [SerializeField] float jumpVelocity = 5f;
     [SerializeField] float jumpChargeRate = 2.5f;
     [SerializeField] float maxJumpCharge = 5f;
     [SerializeField] float jumpCharge = 0f;
+    [SerializeField] float slideMult = 1.5f;
+    [SerializeField] float slideSlowRate = 2.5f;
 
     [SerializeField] float groundRayLength = 1.01f;
 
+    public Vector2 velocity;
+
     [Header("State Machine")]
-    [SerializeField] PlayerState currentState;
-    public PlayerState State => currentState;
+    public FSM fsm = new FSM();
 
-    Dictionary<string, PlayerState> states = new();
-    Transition[] transitions;
-
-    bool Grounded => Physics2D.Raycast(transform.position, Vector3.down, groundRayLength, environmentMask).collider != null;
-
-    public void Transition(PlayerState target, InputFrame input)
-    {
-        currentState.Exit(input);
-        currentState = target;
-        currentState.Init(input);
-    }
-
-    public void CheckTransitions(InputFrame input)
-    {
-        foreach (Transition transition in transitions)
-        {
-            if (transition.Try(this, input))
-            {
-                EventManager.Inst.Send(new PlayerTransitionEvent(transition.Target))
-                break;
-            }
-        }
-    }
-
-    void AddState(PlayerState state)
-    {
-        states.Add(state.name, state);
-    }
+    public bool Grounded => Physics2D.Raycast(transform.position, Vector3.down, groundRayLength, environmentMask).collider != null;
 
     void InitStates()
     {
-        AddState(new PlayerState("Idle",
-            _update: (InputFrame input, float deltaTime) =>
+        fsm.AddState(new State("Idle",
+            update: (float deltaTime) =>
             {
-                rb.linearVelocity = Vector2.zero;
+                rb.linearVelocity = Vector2.MoveTowards(rb.linearVelocity, Vector2.zero, decel * Time.deltaTime);
             }
         ));
 
-        AddState(new PlayerState("Walk",
-            _update: (InputFrame input, float deltaTime) =>
+        fsm.AddState(new State("Walk",
+            update: (float deltaTime) =>
             {
-                // Only modify the horizontal components of velocity
-                Vector2 currentVelocity = rb.linearVelocity;
-                Vector2 horizontalVelocity = new Vector3(input.move.x * speed, 0f);
-                rb.linearVelocity = new Vector2(horizontalVelocity.x, currentVelocity.y);
+                Vector2 horizontalVelocity = new Vector3(InputManager.Inst.lastInput.move.x * speed, 0f);
+                rb.linearVelocity = Vector2.MoveTowards(rb.linearVelocity, new Vector2(horizontalVelocity.x, 0), accel * Time.deltaTime); 
             }
         ));
 
-        AddState(new PlayerState("Crouch",
-            _init: (InputFrame input) => jumpCharge = 0f,
-            _update: (InputFrame input, float deltaTime) =>
+        fsm.AddState(new State("Crouch",
+            update: (float deltaTime) =>
             {
-                rb.linearVelocity = Vector2.MoveTowards(rb.linearVelocity, Vector2.zero, deltaTime);
                 jumpCharge = Mathf.Min(maxJumpCharge, jumpCharge + (jumpChargeRate * deltaTime));
             },
-            _exit: (InputFrame input) => {
-                if (!input.jumpDown)
+            onExit: (State target) => {
+                if (target.Name != "Jump")
                     jumpCharge = 0f;
             }
         ));
 
-        AddState(new PlayerState("Jump",
-            _init: (InputFrame input) =>
+        fsm.AddState(new State("Jump",
+            onEnter: () =>
             {
-                rb.AddForce(Vector2.up * (jumpForce + jumpCharge), ForceMode2D.Impulse);
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpVelocity + jumpCharge);
+                //rb.AddForce(Vector2.up * (jumpVelocity + jumpCharge), ForceMode2D.Impulse);
             },
-            _exit: (InputFrame input) =>
+            update: (float deltaTime) =>
+            {
+                rb.linearVelocity = new Vector2(InputManager.Inst.lastInput.move.x * speed * airMult, rb.linearVelocity.y - gravity * Time.deltaTime);
+            },
+            onExit: (State target) =>
             {
                 jumpCharge = 0f;
             }
         ));
 
-        AddState(new PlayerState("Fall",
-            _update: (InputFrame input, float deltaTime) =>
+        fsm.AddState(new State("Fall",
+            onEnter: () =>
             {
-                rb.linearVelocity = new Vector2(input.move.x * speed * airMult, rb.linearVelocity.y);
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * jumpStopMult);
+            },
+            update: (float deltaTime) =>
+            {
+                rb.linearVelocity = new Vector2(InputManager.Inst.lastInput.move.x * speed * airMult, rb.linearVelocity.y - gravity * fallGravityMult * Time.deltaTime);
+            }
+        ));
+
+        fsm.AddState(new State("Slide",
+            onEnter: () =>
+            {
+                // Apply the clamped horizontal velocity while preserving vertical velocity
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x * slideMult, 0);
+
+                jumpCharge = 0f;
+            },
+            update: (float deltaTime) =>
+            {
+                rb.linearVelocity = Vector2.MoveTowards(rb.linearVelocity, Vector2.zero, slideSlowRate * deltaTime);
+                jumpCharge = Mathf.Min(maxJumpCharge, jumpCharge + (jumpChargeRate * deltaTime));
+            },
+            onExit: (State target) => {
+                if (target.Name != "Jump" && target.Name != "Crouch")
+                    jumpCharge = 0f;
             }
         ));
     }
-
+    
+    //TODO: InputManager overhead?
     void InitTransitions()
     {
-        //TODO: Input bindings
-        transitions = new Transition[] {
-            new Transition(states["Idle"], states["Walk"], (player, input) => input.move != Vector2.zero),
-            new Transition(states["Walk"], states["Idle"], (player, input) => input.move == Vector2.zero),
+        fsm.AddTransitions(
+            new Transition<State>(fsm["Idle"], fsm["Walk"],
+                () => InputManager.Inst.lastInput.move.x != 0),
 
-            new Transition(states["Crouch"], (player, input) => player.Grounded && input.move.y < crouchThreshold),
-            new Transition(states["Crouch"], states["Idle"], (player, input) => input.move.y > crouchThreshold),
+            new Transition<State>(fsm["Walk"], fsm["Idle"],
+                () => InputManager.Inst.lastInput.move.x == 0),
 
-            new Transition(states["Jump"], (player, input) => player.Grounded && input.jumpDown),
-            new Transition(states["Fall"], (player, input) => !player.Grounded),
+            new Transition<State>(fsm["Slide"],
+                () => fsm.State != "Crouch"
+                && Grounded
+                && InputManager.Inst.lastInput.crouchDown
+                && InputManager.Inst.lastInput.move.x != 0),
 
-            new Transition(states["Fall"], states["Idle"], (player, input) => player.Grounded),
+            new Transition<State>(fsm["Crouch"],
+                () => Grounded
+                && InputManager.Inst.lastInput.crouchDown
+                && InputManager.Inst.lastInput.move.x == 0),
 
-            //TODO: Will fix if reducing velocity to 0 for a frame becomes an issue.
-            //new Transition(fall, walk, controller => controller.IsGrounded() && controller.lastInput.move != Vector2.zero),
-        };
+            new Transition<State>(fsm["Crouch"], fsm["Idle"],
+                () => InputManager.Inst.lastInput.crouchDown),
+
+            new Transition<State>(fsm["Jump"],
+                () => Grounded && InputManager.Inst.lastInput.jumpDown),
+
+            new Transition<State>(fsm["Fall"],
+                () => (!Grounded && rb.linearVelocity.y < 0)
+                || (InputManager.Inst.lastInput.jumpUp)),
+
+            new Transition<State>(fsm["Jump"], fsm["Idle"],
+                () => Grounded && rb.linearVelocity.y <= 0),
+
+            new Transition<State>(fsm["Fall"], fsm["Idle"],
+                () => Grounded 
+                && rb.linearVelocity.x == 0
+                && !InputManager.Inst.lastInput.crouchHeld),
+
+            new Transition<State>(fsm["Fall"], fsm["Walk"],
+                () => Grounded
+                && rb.linearVelocity.x != 0
+                && !InputManager.Inst.lastInput.crouchHeld),
+
+            new Transition<State>(fsm["Fall"], fsm["Crouch"],
+                () => Grounded
+                && InputManager.Inst.lastInput.crouchHeld
+                && rb.linearVelocity.x == 0),
+
+            new Transition<State>(fsm["Fall"], fsm["Slide"],
+                () => Grounded
+                && InputManager.Inst.lastInput.crouchHeld
+                && rb.linearVelocity.x != 0),
+
+            new Transition<State>(fsm["Slide"], fsm["Crouch"], () => rb.linearVelocity.x == 0),
+
+            new Transition<State>(fsm["Slide"], fsm["Idle"], () => InputManager.Inst.lastInput.crouchDown)
+        );
     }
 
     private void Awake()
@@ -142,12 +182,18 @@ public class PlayerController : MonoBehaviour
         InitStates();
         InitTransitions();
 
-        currentState = states["Idle"];
+        //Initial state
+        fsm.Interrupt(fsm["Idle"]);
     }
 
     void FixedUpdate()
     {
-        currentState.Update(InputManager.Inst.lastInput, Time.deltaTime);
+        if(fsm.Poll(Time.deltaTime))
+        {
+            //EventManager.Inst.Send();
+        }
+
+        velocity = rb.linearVelocity;
     }
 
     private void OnDrawGizmos()
