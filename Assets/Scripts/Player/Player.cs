@@ -13,7 +13,10 @@ public class Player : MonoBehaviour
         if (input.move.x != 0)
             transform.localScale = new Vector3(-Mathf.Sign(input.move.x), transform.localScale.y, transform.localScale.z);
 
-        controller.fsm.Poll(Time.deltaTime);
+        if(controller.fsm.Poll(Time.deltaTime))
+        {
+            EventManager.Inst.Send(new PlayerTransitionEvent(this, controller.fsm.State));
+        }
 
         if (input.attack)
         {

@@ -22,7 +22,7 @@ namespace Gabadie.GFSM
         public Transition(S _target, params Func<bool>[] _conditions)
         {
             //Source = Target doesn't actually do anything, we just need a value
-            Source = _target;
+            Source = default;
             Target = _target;
             conditions = _conditions;
             fromAny = true;

@@ -37,15 +37,15 @@ public enum PlayerStateType
 //        fromAny = true;
 //    }
 
-//    public bool Try(PlayerController controller, InputFrame input)
-//    {
-//        if (!Source.complete) return false;
+//public bool Try(PlayerController controller, InputFrame input)
+//{
+//    if (!Source.complete) return false;
 
-//        if (((fromAny && controller.State != Target) || controller.State == Source) && condition.All(condition => condition(controller, input)))
-//        {
-//            //controller.Transition(target, input);
-//            return true;
-//        }
-//        return false;
+//    if (((fromAny && controller.State != Target) || controller.State == Source) && condition.All(condition => condition(controller, input)))
+//    {
+//        //controller.Transition(target, input);
+//        return true;
 //    }
+//    return false;
+//}
 //}

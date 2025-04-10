@@ -36,9 +36,14 @@ namespace Gabadie.GFSM
 
             foreach (Transition<S> t in _transitions)
             {
-                if (TryTransition(t))
+                if (CanTransition(t))
                 {
-                    Debug.Log(t.Source.Name + " -> " + t.Target.Name);
+                    if (t.fromAny)
+                        Debug.Log(State.Name + " (ANY) -> " + t.Target.Name);
+                    else
+                        Debug.Log(State.Name + " -> " + t.Target.Name);
+
+                    DoTransition(t.Target);
                     return true;
                 }
             }
@@ -85,15 +90,14 @@ namespace Gabadie.GFSM
         /// True if transition successful.
         /// False if transition unsuccessful.
         /// </returns>
-        public bool TryTransition(Transition<S> t)
+        public bool CanTransition(Transition<S> t)
         {
-            if (!t.Source.Complete) return false;
+            if (!State.Complete) return false;
             if (t.fromAny && State.Equals(t.Target)) return false;
             if (!t.fromAny && !State.Equals(t.Source)) return false;
 
             if (t.conditions.All(p => p()))
             {
-                DoTransition(t.Target);
                 return true;
             }
 

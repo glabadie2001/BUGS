@@ -13,5 +13,7 @@ namespace Gabadie.GFSM
         public bool Complete { get; }
 
         public bool IsAny { get; }
+
+        public static IState Any { get; }
     }
 }

@@ -18,7 +18,7 @@ namespace Gabadie.GFSM
         [SerializeField] bool _isAny;
         public bool IsAny => _isAny;
 
-        public static State Any => new State("Any", null, null, null) { _isAny = true };
+        public static IState Any => new State("Any", null, null, null) { _isAny = true };
 
         public State(string name, Action onEnter = null, Action<float> update = null, Action<State> onExit = null)
         {

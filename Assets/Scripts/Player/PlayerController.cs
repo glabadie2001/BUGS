@@ -188,10 +188,10 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        if(fsm.Poll(Time.deltaTime))
-        {
-            //EventManager.Inst.Send();
-        }
+        //if(fsm.Poll(Time.deltaTime))
+        //{
+        //    EventManager.Inst.Send();
+        //}
 
         velocity = rb.linearVelocity;
     }
