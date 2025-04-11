@@ -3,7 +3,8 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "Attack", menuName = "BUGS/Attack", order = 0)]
 public class Attack : ScriptableObject
 {
-    public string animTrigger;
+    public GameObject prefab;
+    public float radius;
 
     [SerializeField]
     AttackFrame[] hitFrames;

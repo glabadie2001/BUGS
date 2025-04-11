@@ -29,6 +29,11 @@ namespace Gabadie.GFSM
         Dictionary<string, S> _states = new();
         List<Transition<S>> _transitions = new();
 
+        /// <summary>
+        /// Runs the current state and checks for transitions.
+        /// </summary>
+        /// <param name="deltaTime">Time since last frame.</param>
+        /// <returns>Whether a transition has occured or not.</returns>
         public bool Poll(float deltaTime)
         {
             if (State != null)

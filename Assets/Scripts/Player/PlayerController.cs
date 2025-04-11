@@ -49,7 +49,7 @@ public class PlayerController : MonoBehaviour
             }
         ));
 
-        fsm.AddState(new State("Walk",
+        fsm.AddState(new State("Run",
             update: (float deltaTime) =>
             {
                 Vector2 horizontalVelocity = new Vector3(InputManager.Inst.lastInput.move.x * speed, 0f);
@@ -71,8 +71,7 @@ public class PlayerController : MonoBehaviour
         fsm.AddState(new State("Jump",
             onEnter: () =>
             {
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpVelocity + jumpCharge);
-                //rb.AddForce(Vector2.up * (jumpVelocity + jumpCharge), ForceMode2D.Impulse);
+                Jump();
             },
             update: (float deltaTime) =>
             {
@@ -99,7 +98,7 @@ public class PlayerController : MonoBehaviour
             onEnter: () =>
             {
                 // Apply the clamped horizontal velocity while preserving vertical velocity
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x * slideMult, 0);
+                Slide();
 
                 jumpCharge = 0f;
             },
@@ -119,10 +118,10 @@ public class PlayerController : MonoBehaviour
     void InitTransitions()
     {
         fsm.AddTransitions(
-            new Transition<State>(fsm["Idle"], fsm["Walk"],
+            new Transition<State>(fsm["Idle"], fsm["Run"],
                 () => InputManager.Inst.lastInput.move.x != 0),
 
-            new Transition<State>(fsm["Walk"], fsm["Idle"],
+            new Transition<State>(fsm["Run"], fsm["Idle"],
                 () => InputManager.Inst.lastInput.move.x == 0),
 
             new Transition<State>(fsm["Slide"],
@@ -143,7 +142,7 @@ public class PlayerController : MonoBehaviour
                 () => Grounded && InputManager.Inst.lastInput.jumpDown),
 
             new Transition<State>(fsm["Fall"],
-                () => (!Grounded && rb.linearVelocity.y < 0)
+                () => (!Grounded && rb.linearVelocity.y <= 0)
                 || (InputManager.Inst.lastInput.jumpUp)),
 
             new Transition<State>(fsm["Jump"], fsm["Idle"],
@@ -154,7 +153,7 @@ public class PlayerController : MonoBehaviour
                 && rb.linearVelocity.x == 0
                 && !InputManager.Inst.lastInput.crouchHeld),
 
-            new Transition<State>(fsm["Fall"], fsm["Walk"],
+            new Transition<State>(fsm["Fall"], fsm["Run"],
                 () => Grounded
                 && rb.linearVelocity.x != 0
                 && !InputManager.Inst.lastInput.crouchHeld),
@@ -175,6 +174,16 @@ public class PlayerController : MonoBehaviour
         );
     }
 
+    void Jump()
+    {
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpVelocity + jumpCharge);
+    }
+
+    void Slide()
+    {
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x * slideMult, 0);
+    }
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -188,11 +197,6 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        //if(fsm.Poll(Time.deltaTime))
-        //{
-        //    EventManager.Inst.Send();
-        //}
-
         velocity = rb.linearVelocity;
     }
 

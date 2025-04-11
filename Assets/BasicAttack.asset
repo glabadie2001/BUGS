@@ -12,7 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2d5abc7621fb9343aad1e055b853705, type: 3}
   m_Name: BasicAttack
   m_EditorClassIdentifier: 
-  animTrigger: Basic
+  prefab: {fileID: 4817953795666032377, guid: aada91936ff67f344852e65c73924c4a, type: 3}
+  radius: 1.5
   hitFrames:
   - active: 0
     hitOffset: {x: 0, y: 0}

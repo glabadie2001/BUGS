@@ -39,17 +39,34 @@ public class PlayerAttackEvent : Event
 {
     Player player;
     Attack attack;
+    Vector2 direction;
 
     public PlayerAttackEvent(Player _player, Attack _attack)
     {
         player = _player;
         attack = _attack;
+        direction = InputManager.Inst.lastInput.move.normalized;
     }
-
+    
     public override void Execute()
     {
-        player.animator.PlayAttack(attack.animTrigger);
-        //player.controller.Attack(attack);
+        // If no direction input, default to facing direction
+        if (direction == Vector2.zero)
+            direction = new Vector2(-player.transform.localScale.x, 0);
+        else
+            direction = direction.normalized; // Ensure the direction is normalized
+
+        // Calculate spawn position by rotating around the player at a fixed radius
+        Vector3 spawnPosition = player.transform.position + (Vector3)(direction * attack.radius);
+
+        // Calculate rotation to face attack direction
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        Quaternion rotation = Quaternion.Euler(0, 0, angle);
+
+        // Instantiate attack prefab
+        AttackParticle spawnedAttack = GameObject.Instantiate(attack.prefab, spawnPosition, rotation).GetComponent<AttackParticle>();
+
+        spawnedAttack.target = player;
     }
 }
 

@@ -12,8 +12,8 @@ public class PlayerAnimator : MonoBehaviour
         playerAnim.Play(trigger);
     }
 
-    public void PlayAttack(string trigger)
+    public void SetFloat(string name, float value)
     {
-        attackAnim.SetTrigger(trigger);
+        playerAnim.SetFloat(name, value);
     }
 }
